@@ -88,7 +88,7 @@
   <div class="section">次回が近い順 <span class="count" id="restCount"></span></div>
   <div class="list" id="rest"></div>
 
-  <div class="hint">タップ＝今日やった　長押し＝日付を選んで記録<br>v6</div>
+  <div class="hint">タップ＝今日やった　長押し＝日付を選んで記録<br>v7</div>
 </div>
 
 <div class="keybox" id="keybox">
@@ -114,9 +114,10 @@ const $ = id => document.getElementById(id);
 const API = 'https://script.google.com/macros/s/AKfycbx0hjnf9ByfIm3d4XVJGvjlYjtIqQCq9M0IzEtYrv6oO-crcH93ujxVuM3NbVPY_3g/exec';
 
 // 合言葉は ?k= で渡されたら端末に保存する。ホーム画面のアプリはSafariと保存領域が別なので、無ければ入力欄を出す
+// 入力欄で打ち直した合言葉は、アドレスの ?k= より優先する（アドレス側が間違っていても直せるように）
 function getKey() {
   const q = new URLSearchParams(location.search).get('k');
-  if (q) localStorage.setItem('kaji_key', q);
+  if (q && !localStorage.getItem('kaji_key_manual')) localStorage.setItem('kaji_key', q);
   return localStorage.getItem('kaji_key');
 }
 
@@ -129,13 +130,17 @@ async function call(body) {
 
 function load() {
   if (!getKey()) { $('keybox').style.display = 'block'; $('due').innerHTML = ''; return; }
-  call({ action: 'items' }).then(render).catch(showError);
+  call({ action: 'items' }).then(render).catch(e => {
+    if (e.message === '合言葉が違います') { $('keybox').style.display = 'block'; $('due').innerHTML = ''; return; }
+    showError(e);
+  });
 }
 
 $('keyOk').onclick = () => {
   const v = $('keyInput').value.trim();
   if (!v) return;
   localStorage.setItem('kaji_key', v);
+  localStorage.setItem('kaji_key_manual', '1');
   $('keybox').style.display = 'none';
   load();
 };
