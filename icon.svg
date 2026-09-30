@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f1f0ec"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- 周期を表す円の矢印 -->
+  <g fill="none" stroke="#37352f" stroke-width="34" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 386 196 A 150 150 0 1 0 404 280"/>
+    <path d="M 404 150 L 392 204 L 338 192"/>
+  </g>
+  <!-- やったのチェック -->
+  <path d="M 198 262 L 240 304 L 316 224" fill="none" stroke="#448361" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

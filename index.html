@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="家事">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#ffffff">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<title>家事</title>
+<style>
+  /* Notion風：白地・細い罫線・控えめな色のタグ */
+  :root {
+    --text: #37352f; --sub: #787774; --faint: #9b9a97; --line: rgba(55,53,47,.09);
+    --hover: rgba(55,53,47,.06); --bg: #ffffff;
+    --red-bg: #fdebec; --red: #d44c47; --orange-bg: #fbecdd; --orange: #d9730d;
+    --gray-bg: #f1f1ef; --green-bg: #edf3ec; --green: #448361;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); -webkit-user-select: none; user-select: none;
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased; }
+  .page { max-width: 640px; margin: 0 auto; padding: calc(20px + env(safe-area-inset-top)) 18px 110px; }
+  .icon { font-size: 44px; line-height: 1; }
+  h1 { font-size: 30px; font-weight: 700; margin: 10px 0 4px; letter-spacing: -.01em; }
+  .date { color: var(--sub); font-size: 14px; margin-bottom: 22px; }
+
+  .section { display: flex; align-items: center; gap: 6px; margin: 22px 0 6px; padding: 0 2px;
+    font-size: 14px; font-weight: 600; color: var(--sub); }
+  .count { color: var(--faint); font-weight: 400; }
+  .list { border-top: 1px solid var(--line); }
+  .row { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--line);
+    -webkit-touch-callout: none; transition: background .15s, opacity .2s; }
+  .row:active { background: var(--hover); }
+  .row.busy { opacity: .4; pointer-events: none; }
+  .check { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid #c7c6c3; }
+  .row.busy .check { background: var(--green); border-color: var(--green); }
+  .body { flex: 1; min-width: 0; }
+  .name { font-size: 16px; line-height: 1.35; }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 5px; font-size: 12.5px; color: var(--faint); }
+  .tag { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 12.5px; line-height: 1.6; white-space: nowrap; }
+  .t-place { background: var(--gray-bg); color: var(--sub); }
+  .t-late { background: var(--red-bg); color: var(--red); }
+  .t-due { background: var(--orange-bg); color: var(--orange); }
+  .t-ok { background: var(--green-bg); color: var(--green); }
+  .empty { color: var(--faint); font-size: 14px; padding: 12px 4px; border-bottom: 1px solid var(--line); }
+  .error { color: var(--red); font-size: 14px; padding: 12px 4px; }
+  .hint { color: var(--faint); font-size: 12px; text-align: center; margin-top: 26px; line-height: 1.8; }
+
+  /* 下から出るシート（日付選択） */
+  .scrim { position: fixed; inset: 0; background: rgba(15,15,15,.35); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .scrim.show { opacity: 1; pointer-events: auto; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-radius: 14px 14px 0 0;
+    padding: 18px 18px calc(18px + env(safe-area-inset-bottom)); transform: translateY(100%); transition: transform .22s ease; }
+  .sheet.show { transform: none; }
+  .sheet-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .sheet-sub { font-size: 13px; color: var(--sub); margin-bottom: 14px; }
+  .sheet input { width: 100%; font-size: 17px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
+    background: #f7f7f5; color: var(--text); -webkit-appearance: none; appearance: none; min-height: 46px; }
+  .btns { display: flex; gap: 10px; margin-top: 16px; }
+  .btn { flex: 1; font-size: 16px; padding: 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--text); }
+  .btn.primary { background: #2383e2; border-color: #2383e2; color: #fff; font-weight: 600; }
+
+  .keybox { display: none; max-width: 640px; margin: 0 auto; padding: 0 18px 40px; }
+  .keybox input { width: 100%; font-size: 16px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: #f7f7f5; }
+
+  /* 記録後のお知らせ */
+  .toast { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px);
+    width: calc(100% - 32px); max-width: 480px; background: #2f3437; color: #fff; border-radius: 10px;
+    padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; font-size: 14.5px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.18); opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  .toast button { background: none; border: none; color: #7cc4ff; font-size: 14.5px; font-weight: 600; padding: 4px 0 4px 12px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="icon">🧹</div>
+  <h1>家事</h1>
+  <div class="date" id="date"></div>
+
+  <div class="section">期限が来たもの <span class="count" id="dueCount"></span></div>
+  <div class="list" id="due"><div class="empty">読み込み中…</div></div>
+
+  <div class="section">次回が近い順 <span class="count" id="restCount"></span></div>
+  <div class="list" id="rest"></div>
+
+  <div class="hint">タップ＝今日やった　長押し＝日付を選んで記録<br>v6</div>
+</div>
+
+<div class="keybox" id="keybox">
+  <div class="sheet-title">合言葉を入れてください</div>
+  <div class="sheet-sub">初回だけ必要です。Claudeが渡したものを貼り付けます</div>
+  <input id="keyInput" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <div class="btns"><button class="btn primary" id="keyOk">保存</button></div>
+</div>
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-title" id="sheetName"></div>
+  <div class="sheet-sub">やった日を選んでください</div>
+  <input type="date" id="sheetDate">
+  <div class="btns"><button class="btn" id="sheetCancel">やめる</button><button class="btn primary" id="sheetOk">記録</button></div>
+</div>
+<div class="toast" id="toast"><span id="toastMsg"></span><button id="undoBtn">取り消す</button></div>
+
+<script>
+let data = null, lastUndo = null, toastTimer = null, pickItem = null;
+const $ = id => document.getElementById(id);
+
+// データはGoogle Apps Script経由でNotionから読み書きする
+const API = 'https://script.google.com/macros/s/AKfycbx0hjnf9ByfIm3d4XVJGvjlYjtIqQCq9M0IzEtYrv6oO-crcH93ujxVuM3NbVPY_3g/exec';
+
+// 合言葉は ?k= で渡されたら端末に保存する。ホーム画面のアプリはSafariと保存領域が別なので、無ければ入力欄を出す
+function getKey() {
+  const q = new URLSearchParams(location.search).get('k');
+  if (q) localStorage.setItem('kaji_key', q);
+  return localStorage.getItem('kaji_key');
+}
+
+async function call(body) {
+  const res = await fetch(API, { method: 'POST', body: JSON.stringify(Object.assign({ k: getKey() }, body)) });
+  const json = await res.json();
+  if (json.error) throw new Error(json.error);
+  return json;
+}
+
+function load() {
+  if (!getKey()) { $('keybox').style.display = 'block'; $('due').innerHTML = ''; return; }
+  call({ action: 'items' }).then(render).catch(showError);
+}
+
+$('keyOk').onclick = () => {
+  const v = $('keyInput').value.trim();
+  if (!v) return;
+  localStorage.setItem('kaji_key', v);
+  $('keybox').style.display = 'none';
+  load();
+};
+
+// サーバーのnullは画面に届くとundefinedになるので == null で判定する
+function status(i) {
+  if (i.daysLeft == null) return '<span class="tag t-late">未記録</span>';
+  if (i.daysLeft < 0) return '<span class="tag t-late">' + (-i.daysLeft) + '日遅れ</span>';
+  if (i.daysLeft === 0) return '<span class="tag t-due">今日</span>';
+  return '<span class="tag t-ok">あと' + i.daysLeft + '日</span>';
+}
+
+function row(i) {
+  const last = i.last ? '前回 ' + Number(i.last.slice(5, 7)) + '/' + Number(i.last.slice(8)) : '前回なし';
+  return '<div class="row" data-id="' + i.id + '"><div class="check"></div><div class="body">' +
+    '<div class="name">' + esc(i.name) + '</div><div class="meta">' + status(i) +
+    (i.place ? '<span class="tag t-place">' + esc(i.place) + '</span>' : '') +
+    '<span>' + last + '・' + i.cycle + '日ごと</span></div></div></div>';
+}
+
+function render(d) {
+  data = d;
+  const t = new Date(d.today + 'T00:00:00');
+  $('date').textContent = (t.getMonth() + 1) + '月' + t.getDate() + '日（' + '日月火水木金土'[t.getDay()] + '）';
+  const due = d.items.filter(i => i.daysLeft == null || i.daysLeft <= 0);
+  const rest = d.items.filter(i => i.daysLeft != null && i.daysLeft > 0);
+  $('due').innerHTML = due.length ? due.map(row).join('') : '<div class="empty">なし</div>';
+  $('rest').innerHTML = rest.length ? rest.map(row).join('') : '<div class="empty">なし</div>';
+  $('dueCount').textContent = due.length;
+  $('restCount').textContent = rest.length;
+  document.querySelectorAll('.row').forEach(attach);
+}
+
+function attach(el) {
+  let timer = null, long = false, moved = false;
+  el.addEventListener('touchstart', () => { long = false; moved = false; timer = setTimeout(() => { long = true; openSheet(el.dataset.id); }, 550); }, { passive: true });
+  el.addEventListener('touchmove', () => { moved = true; clearTimeout(timer); }, { passive: true });
+  el.addEventListener('touchend', e => { clearTimeout(timer); if (!long && !moved) { e.preventDefault(); done(el.dataset.id, null); } });
+  el.addEventListener('click', () => { if (!('ontouchstart' in window)) done(el.dataset.id, null); });
+  el.addEventListener('contextmenu', e => e.preventDefault());
+}
+
+function done(id, date) {
+  const el = document.querySelector('.row[data-id="' + id + '"]');
+  if (!el || el.classList.contains('busy')) return; // 二重記録を防ぐ
+  el.classList.add('busy');
+  const item = data.items.find(i => i.id === id);
+  call({ action: 'done', itemId: id, date: date }).then(r => {
+    lastUndo = { logId: r.logId, itemId: id };
+    toast(item.name + ' を記録しました', true);
+    load();
+  }).catch(e => { el.classList.remove('busy'); showError(e); });
+}
+
+function toast(msg, undoable) {
+  $('toastMsg').textContent = msg;
+  $('undoBtn').style.display = undoable ? '' : 'none';
+  $('toast').classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { $('toast').classList.remove('show'); lastUndo = null; }, 6000);
+}
+
+$('undoBtn').onclick = () => {
+  if (!lastUndo) return;
+  const u = lastUndo; lastUndo = null;
+  $('toast').classList.remove('show');
+  clearTimeout(toastTimer);
+  call({ action: 'undo', logId: u.logId, itemId: u.itemId })
+    .then(() => { toast('取り消しました', false); load(); }).catch(showError);
+};
+
+function openSheet(id) {
+  pickItem = data.items.find(i => i.id === id);
+  $('sheetName').textContent = pickItem.name;
+  $('sheetDate').value = data.today;
+  $('sheetDate').max = data.today;
+  $('scrim').classList.add('show');
+  $('sheet').classList.add('show');
+}
+function closeSheet() { $('scrim').classList.remove('show'); $('sheet').classList.remove('show'); }
+$('scrim').onclick = closeSheet;
+$('sheetCancel').onclick = closeSheet;
+$('sheetOk').onclick = () => { closeSheet(); done(pickItem.id, $('sheetDate').value); };
+
+// 失敗は画面に残す（トーストだけだと消えて原因が分からない）
+function showError(e) { $('due').innerHTML = '<div class="error">エラー：' + esc(e.message || String(e)) + '</div>'; }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
+
+load();
+</script>
+</body>
+</html>
