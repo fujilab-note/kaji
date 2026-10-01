@@ -12,93 +12,174 @@
 <link rel="icon" href="icon-180.png">
 <title>家事</title>
 <style>
-  /* Notion風：白地・細い罫線・控えめな色のタグ */
+  /* Notion風の落ち着いた配色をベースに、カバー・サマリー・進み具合のバーで情報を足す */
   :root {
-    --text: #37352f; --sub: #787774; --faint: #9b9a97; --line: rgba(55,53,47,.09);
-    --hover: rgba(55,53,47,.06); --bg: #ffffff;
+    --text: #37352f; --sub: #787774; --faint: #a5a29d; --line: rgba(55,53,47,.08);
+    --hover: rgba(55,53,47,.05); --bg: #ffffff; --card: #fbfbfa; --sheet: #ffffff; --input: #f7f7f5;
     --red-bg: #fdebec; --red: #d44c47; --orange-bg: #fbecdd; --orange: #d9730d;
-    --gray-bg: #f1f1ef; --green-bg: #edf3ec; --green: #448361;
+    --gray-bg: #f1f1ef; --green-bg: #edf3ec; --green: #448361; --track: #efeeeb;
+    --cover: linear-gradient(120deg, #e9efe6 0%, #f4efe4 55%, #f6e9e2 100%);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --text: #e6e5e3; --sub: #9b9a97; --faint: #7d7b78; --line: rgba(255,255,255,.08);
+      --hover: rgba(255,255,255,.05); --bg: #191919; --card: #202020; --sheet: #252525; --input: #2c2c2c;
+      --red-bg: rgba(212,76,71,.18); --red: #ff7369; --orange-bg: rgba(217,115,13,.2); --orange: #ffa344;
+      --gray-bg: rgba(255,255,255,.07); --green-bg: rgba(68,131,97,.22); --green: #6fc08f; --track: #2e2e2e;
+      --cover: linear-gradient(120deg, #24302a 0%, #2e2a22 55%, #33261f 100%);
+    }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); -webkit-user-select: none; user-select: none;
     font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Segoe UI", sans-serif;
-    -webkit-font-smoothing: antialiased; }
-  .page { max-width: 640px; margin: 0 auto; padding: calc(20px + env(safe-area-inset-top)) 18px 110px; }
-  .icon { font-size: 44px; line-height: 1; }
-  h1 { font-size: 30px; font-weight: 700; margin: 10px 0 4px; letter-spacing: -.01em; }
-  .date { color: var(--sub); font-size: 14px; margin-bottom: 22px; }
+    -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
 
-  .section { display: flex; align-items: center; gap: 6px; margin: 22px 0 6px; padding: 0 2px;
-    font-size: 14px; font-weight: 600; color: var(--sub); }
-  .count { color: var(--faint); font-weight: 400; }
+  /* カバーとアイコン（Notionのページ頭の形） */
+  .cover { height: calc(96px + env(safe-area-inset-top)); background: var(--cover); }
+  .page { max-width: 640px; margin: 0 auto; padding: 0 18px 110px; }
+  .logo { width: 64px; height: 64px; margin-top: -32px; border-radius: 16px; background: var(--bg);
+    box-shadow: 0 0 0 1px var(--line), 0 6px 18px rgba(15,15,15,.10); display: flex; align-items: center; justify-content: center; }
+  .logo svg { width: 54px; height: 54px; }
+  h1 { font-size: 30px; font-weight: 700; margin: 14px 0 2px; letter-spacing: -.01em; }
+  .date { color: var(--sub); font-size: 14px; }
+
+  /* サマリー：期限内の割合の輪と、状態ごとの件数 */
+  .summary { display: flex; align-items: center; gap: 16px; margin: 20px 0 6px; padding: 14px 16px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+  .ring { position: relative; width: 64px; height: 64px; flex: none; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring-num { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 700; line-height: 1; }
+  .ring-num small { font-size: 10px; font-weight: 500; color: var(--sub); margin-top: 3px; }
+  .ring-bar { transition: stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1); }
+  .stats { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .stat { text-align: center; }
+  .stat b { display: block; font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+  .stat span { font-size: 11.5px; color: var(--sub); }
+  .stat.late b { color: var(--red); } .stat.soon b { color: var(--orange); } .stat.ok b { color: var(--green); }
+
+  .section { display: flex; align-items: center; gap: 6px; margin: 24px 0 4px; padding: 0 2px;
+    font-size: 13px; font-weight: 600; color: var(--sub); letter-spacing: .02em; }
+  .section svg { width: 14px; height: 14px; }
+  .count { color: var(--faint); font-weight: 500; }
   .list { border-top: 1px solid var(--line); }
-  .row { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--line);
-    -webkit-touch-callout: none; transition: background .15s, opacity .2s; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 13px 4px 12px; border-bottom: 1px solid var(--line);
+    -webkit-touch-callout: none; transition: background .15s, opacity .3s, transform .3s; animation: rise .35s both; }
   .row:active { background: var(--hover); }
-  .row.busy { opacity: .4; pointer-events: none; }
-  .check { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid #c7c6c3; }
-  .row.busy .check { background: var(--green); border-color: var(--green); }
-  .body { flex: 1; min-width: 0; }
+  .row.busy { pointer-events: none; }
+  .row.busy .body { opacity: .45; }
+  @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  /* チェック：押すと緑に塗られてチェックが描かれる */
+  .check { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1.6px solid var(--faint); display: flex;
+    align-items: center; justify-content: center; transition: background .2s, border-color .2s, transform .2s; }
+  .check svg { width: 14px; height: 14px; stroke: #fff; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: 20; stroke-dashoffset: 20; transition: stroke-dashoffset .3s .1s; }
+  .row.busy .check { background: var(--green); border-color: var(--green); transform: scale(1.08); }
+  .row.busy .check svg { stroke-dashoffset: 0; }
+
+  .body { flex: 1; min-width: 0; transition: opacity .3s; }
+  .top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
   .name { font-size: 16px; line-height: 1.35; }
-  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 5px; font-size: 12.5px; color: var(--faint); }
-  .tag { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 12.5px; line-height: 1.6; white-space: nowrap; }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; font-size: 12.5px; color: var(--faint); }
+  .tag { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 12px; line-height: 1.6; white-space: nowrap; }
   .t-place { background: var(--gray-bg); color: var(--sub); }
   .t-late { background: var(--red-bg); color: var(--red); }
   .t-due { background: var(--orange-bg); color: var(--orange); }
   .t-ok { background: var(--green-bg); color: var(--green); }
-  .empty { color: var(--faint); font-size: 14px; padding: 12px 4px; border-bottom: 1px solid var(--line); }
-  .error { color: var(--red); font-size: 14px; padding: 12px 4px; }
-  .hint { color: var(--faint); font-size: 12px; text-align: center; margin-top: 26px; line-height: 1.8; }
+  /* 周期のうちどれだけ経ったかの細いバー */
+  .bar { height: 3px; border-radius: 3px; background: var(--track); margin-top: 9px; overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 3px; transition: width .8s cubic-bezier(.2,.8,.2,1); }
 
-  /* 下から出るシート（日付選択） */
+  .empty { color: var(--faint); font-size: 14px; padding: 14px 4px; border-bottom: 1px solid var(--line); }
+  .error { color: var(--red); font-size: 14px; padding: 12px 4px; }
+  .skeleton { height: 58px; border-bottom: 1px solid var(--line); background: linear-gradient(90deg, transparent, var(--hover), transparent);
+    background-size: 200% 100%; animation: shimmer 1.2s infinite; }
+  @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+  .hint { color: var(--faint); font-size: 12px; text-align: center; margin-top: 28px; line-height: 1.8; }
+
+  /* 下から出るシート（日付選択・合言葉） */
   .scrim { position: fixed; inset: 0; background: rgba(15,15,15,.35); opacity: 0; pointer-events: none; transition: opacity .2s; }
   .scrim.show { opacity: 1; pointer-events: auto; }
-  .sheet { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-radius: 14px 14px 0 0;
-    padding: 18px 18px calc(18px + env(safe-area-inset-bottom)); transform: translateY(100%); transition: transform .22s ease; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; background: var(--sheet); border-radius: 16px 16px 0 0;
+    padding: 10px 18px calc(18px + env(safe-area-inset-bottom)); transform: translateY(100%); transition: transform .25s cubic-bezier(.2,.8,.2,1); }
   .sheet.show { transform: none; }
-  .sheet-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .grabber { width: 36px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto 14px; }
+  .sheet-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
   .sheet-sub { font-size: 13px; color: var(--sub); margin-bottom: 14px; }
-  .sheet input { width: 100%; font-size: 17px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
-    background: #f7f7f5; color: var(--text); -webkit-appearance: none; appearance: none; min-height: 46px; }
+  .sheet input, .keybox input { width: 100%; font-size: 17px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--input); color: var(--text); -webkit-appearance: none; appearance: none; min-height: 46px; }
   .btns { display: flex; gap: 10px; margin-top: 16px; }
-  .btn { flex: 1; font-size: 16px; padding: 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--text); }
+  .btn { flex: 1; font-size: 16px; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--sheet); color: var(--text); }
   .btn.primary { background: #2383e2; border-color: #2383e2; color: #fff; font-weight: 600; }
-
-  .keybox { display: none; max-width: 640px; margin: 0 auto; padding: 0 18px 40px; }
-  .keybox input { width: 100%; font-size: 16px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: #f7f7f5; }
+  .keybox { display: none; margin-top: 18px; padding: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
 
   /* 記録後のお知らせ */
   .toast { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px);
-    width: calc(100% - 32px); max-width: 480px; background: #2f3437; color: #fff; border-radius: 10px;
+    width: calc(100% - 32px); max-width: 480px; background: rgba(47,52,55,.96); color: #fff; border-radius: 12px;
     padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; font-size: 14.5px;
-    box-shadow: 0 8px 24px rgba(0,0,0,.18); opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; }
+    box-shadow: 0 10px 30px rgba(0,0,0,.2); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    opacity: 0; pointer-events: none; transition: opacity .2s, transform .25s cubic-bezier(.2,.8,.2,1); }
   .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
   .toast button { background: none; border: none; color: #7cc4ff; font-size: 14.5px; font-weight: 600; padding: 4px 0 4px 12px; }
 </style>
 </head>
 <body>
+<div class="cover"></div>
 <div class="page">
-  <div class="icon">🧹</div>
+  <div class="logo">
+    <!-- ホーム画面のアイコンと同じ図柄：周期の矢印とチェック -->
+    <svg viewBox="0 0 512 512" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-width="34" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M 386 196 A 150 150 0 1 0 404 280"/><path d="M 404 150 L 392 204 L 338 192"/>
+      </g>
+      <path d="M 198 262 L 240 304 L 316 224" fill="none" stroke="#448361" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
   <h1>家事</h1>
-  <div class="date" id="date"></div>
+  <div class="date" id="date">&nbsp;</div>
 
-  <div class="section">期限が来たもの <span class="count" id="dueCount"></span></div>
-  <div class="list" id="due"><div class="empty">読み込み中…</div></div>
+  <div class="summary" id="summary" style="display:none">
+    <div class="ring">
+      <svg width="64" height="64" viewBox="0 0 64 64">
+        <circle cx="32" cy="32" r="27" fill="none" stroke="var(--track)" stroke-width="7"/>
+        <circle class="ring-bar" id="ringBar" cx="32" cy="32" r="27" fill="none" stroke="var(--green)" stroke-width="7"
+          stroke-linecap="round" stroke-dasharray="169.6" stroke-dashoffset="169.6"/>
+      </svg>
+      <div class="ring-num"><span id="ringPct">0%</span><small>期限内</small></div>
+    </div>
+    <div class="stats">
+      <div class="stat late"><b id="nLate">0</b><span>期限切れ</span></div>
+      <div class="stat soon"><b id="nSoon">0</b><span>7日以内</span></div>
+      <div class="stat ok"><b id="nOk">0</b><span>余裕あり</span></div>
+    </div>
+  </div>
 
-  <div class="section">次回が近い順 <span class="count" id="restCount"></span></div>
+  <div class="keybox" id="keybox">
+    <div class="sheet-title">合言葉を入れてください</div>
+    <div class="sheet-sub">初回だけ必要です。Claudeが渡したものを貼り付けます</div>
+    <input id="keyInput" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <div class="btns"><button class="btn primary" id="keyOk">保存</button></div>
+  </div>
+
+  <div class="section">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.2"/><path d="M8 4.6V8l2.2 1.4" stroke-linecap="round"/></svg>
+    期限が来たもの <span class="count" id="dueCount"></span>
+  </div>
+  <div class="list" id="due"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+
+  <div class="section">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 4.5h10M3 8h7M3 11.5h4"/></svg>
+    次回が近い順 <span class="count" id="restCount"></span>
+  </div>
   <div class="list" id="rest"></div>
 
-  <div class="hint">タップ＝今日やった　長押し＝日付を選んで記録<br>v7</div>
+  <div class="hint">タップ＝今日やった　長押し＝日付を選んで記録<br>v8</div>
 </div>
 
-<div class="keybox" id="keybox">
-  <div class="sheet-title">合言葉を入れてください</div>
-  <div class="sheet-sub">初回だけ必要です。Claudeが渡したものを貼り付けます</div>
-  <input id="keyInput" autocomplete="off" autocapitalize="off" spellcheck="false">
-  <div class="btns"><button class="btn primary" id="keyOk">保存</button></div>
-</div>
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet">
+  <div class="grabber"></div>
   <div class="sheet-title" id="sheetName"></div>
   <div class="sheet-sub">やった日を選んでください</div>
   <input type="date" id="sheetDate">
@@ -128,12 +209,11 @@ async function call(body) {
   return json;
 }
 
+function askKey() { $('keybox').style.display = 'block'; $('due').innerHTML = ''; }
+
 function load() {
-  if (!getKey()) { $('keybox').style.display = 'block'; $('due').innerHTML = ''; return; }
-  call({ action: 'items' }).then(render).catch(e => {
-    if (e.message === '合言葉が違います') { $('keybox').style.display = 'block'; $('due').innerHTML = ''; return; }
-    showError(e);
-  });
+  if (!getKey()) return askKey();
+  call({ action: 'items' }).then(render).catch(e => e.message === '合言葉が違います' ? askKey() : showError(e));
 }
 
 $('keyOk').onclick = () => {
@@ -150,15 +230,26 @@ function status(i) {
   if (i.daysLeft == null) return '<span class="tag t-late">未記録</span>';
   if (i.daysLeft < 0) return '<span class="tag t-late">' + (-i.daysLeft) + '日遅れ</span>';
   if (i.daysLeft === 0) return '<span class="tag t-due">今日</span>';
-  return '<span class="tag t-ok">あと' + i.daysLeft + '日</span>';
+  return '<span class="tag ' + (i.daysLeft <= 7 ? 't-due' : 't-ok') + '">あと' + i.daysLeft + '日</span>';
 }
 
-function row(i) {
+// 周期のうち経った割合（未記録・遅れは満タン）と、その色
+function progress(i) {
+  if (i.daysLeft == null || i.daysLeft <= 0) return { pct: 100, color: i.daysLeft === 0 ? 'var(--orange)' : 'var(--red)' };
+  const pct = Math.max(4, Math.round((1 - i.daysLeft / i.cycle) * 100));
+  return { pct: pct, color: i.daysLeft <= 7 ? 'var(--orange)' : 'var(--green)' };
+}
+
+const CHECK = '<svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-6.5"/></svg>';
+
+function row(i, n) {
   const last = i.last ? '前回 ' + Number(i.last.slice(5, 7)) + '/' + Number(i.last.slice(8)) : '前回なし';
-  return '<div class="row" data-id="' + i.id + '"><div class="check"></div><div class="body">' +
-    '<div class="name">' + esc(i.name) + '</div><div class="meta">' + status(i) +
-    (i.place ? '<span class="tag t-place">' + esc(i.place) + '</span>' : '') +
-    '<span>' + last + '・' + i.cycle + '日ごと</span></div></div></div>';
+  const p = progress(i);
+  return '<div class="row" data-id="' + i.id + '" style="animation-delay:' + (n * 35) + 'ms"><div class="check">' + CHECK + '</div>' +
+    '<div class="body"><div class="top"><div class="name">' + esc(i.name) + '</div></div>' +
+    '<div class="meta">' + status(i) + (i.place ? '<span class="tag t-place">' + esc(i.place) + '</span>' : '') +
+    '<span>' + last + '・' + i.cycle + '日ごと</span></div>' +
+    '<div class="bar"><i style="width:0;background:' + p.color + '" data-w="' + p.pct + '"></i></div></div></div>';
 }
 
 function render(d) {
@@ -167,10 +258,22 @@ function render(d) {
   $('date').textContent = (t.getMonth() + 1) + '月' + t.getDate() + '日（' + '日月火水木金土'[t.getDay()] + '）';
   const due = d.items.filter(i => i.daysLeft == null || i.daysLeft <= 0);
   const rest = d.items.filter(i => i.daysLeft != null && i.daysLeft > 0);
-  $('due').innerHTML = due.length ? due.map(row).join('') : '<div class="empty">なし</div>';
-  $('rest').innerHTML = rest.length ? rest.map(row).join('') : '<div class="empty">なし</div>';
+  $('due').innerHTML = due.length ? due.map(row).join('') : '<div class="empty">すべて期限内です</div>';
+  $('rest').innerHTML = rest.length ? rest.map((i, n) => row(i, n + due.length)).join('') : '<div class="empty">なし</div>';
   $('dueCount').textContent = due.length;
   $('restCount').textContent = rest.length;
+
+  // サマリー
+  const soon = rest.filter(i => i.daysLeft <= 7).length;
+  const total = d.items.length || 1;
+  const pct = Math.round(rest.length / total * 100);
+  $('nLate').textContent = due.length; $('nSoon').textContent = soon; $('nOk').textContent = rest.length - soon;
+  $('ringPct').textContent = pct + '%';
+  $('summary').style.display = 'flex';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    $('ringBar').style.strokeDashoffset = 169.6 * (1 - pct / 100);
+    document.querySelectorAll('.bar i').forEach(b => b.style.width = b.dataset.w + '%');
+  }));
   document.querySelectorAll('.row').forEach(attach);
 }
 
@@ -187,6 +290,7 @@ function done(id, date) {
   const el = document.querySelector('.row[data-id="' + id + '"]');
   if (!el || el.classList.contains('busy')) return; // 二重記録を防ぐ
   el.classList.add('busy');
+  if (navigator.vibrate) navigator.vibrate(10);
   const item = data.items.find(i => i.id === id);
   call({ action: 'done', itemId: id, date: date }).then(r => {
     lastUndo = { logId: r.logId, itemId: id };
@@ -228,6 +332,9 @@ $('sheetOk').onclick = () => { closeSheet(); done(pickItem.id, $('sheetDate').va
 // 失敗は画面に残す（トーストだけだと消えて原因が分からない）
 function showError(e) { $('due').innerHTML = '<div class="error">エラー：' + esc(e.message || String(e)) + '</div>'; }
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
+
+// アプリに戻ってきたら最新にする（日付が変わっても古い表示のままにしない）
+document.addEventListener('visibilitychange', () => { if (!document.hidden && data) load(); });
 
 load();
 </script>
