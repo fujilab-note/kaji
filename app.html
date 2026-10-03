@@ -112,6 +112,7 @@
   .btns { display: flex; gap: 10px; margin-top: 16px; }
   .btn { flex: 1; font-size: 16px; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--sheet); color: var(--text); }
   .btn.primary { background: #2383e2; border-color: #2383e2; color: #fff; font-weight: 600; }
+  .undo-last { display: block; width: 100%; margin-top: 14px; padding: 10px; background: none; border: none; color: var(--red); font-size: 15px; }
   .keybox { display: none; margin-top: 18px; padding: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
 
   /* 記録後のお知らせ */
@@ -174,7 +175,7 @@
   </div>
   <div class="list" id="rest"></div>
 
-  <div class="hint">タップ＝今日やった　長押し＝日付を選んで記録<br>v9</div>
+  <div class="hint">タップ＝今日やった　長押し＝日付を選んで記録・前回の記録の取り消し<br>v10</div>
 </div>
 
 <div class="scrim" id="scrim"></div>
@@ -184,6 +185,7 @@
   <div class="sheet-sub">やった日を選んでください</div>
   <input type="date" id="sheetDate">
   <div class="btns"><button class="btn" id="sheetCancel">やめる</button><button class="btn primary" id="sheetOk">記録</button></div>
+  <button class="undo-last" id="sheetUndo"></button>
 </div>
 <div class="toast" id="toast"><span id="toastMsg"></span><button id="undoBtn">取り消す</button></div>
 
@@ -287,6 +289,8 @@ function attach(el) {
 }
 
 function done(id, date) {
+  const item0 = data.items.find(i => i.id === id);
+  if (!date && item0 && item0.last === data.today) return openSheet(id); // 今日もう記録済みなら二重に足さず、取り消しを選べる画面を出す
   const el = document.querySelector('.row[data-id="' + id + '"]');
   if (!el || el.classList.contains('busy')) return; // 二重記録を防ぐ
   el.classList.add('busy');
@@ -304,7 +308,7 @@ function toast(msg, undoable) {
   $('undoBtn').style.display = undoable ? '' : 'none';
   $('toast').classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { $('toast').classList.remove('show'); lastUndo = null; }, 6000);
+  toastTimer = setTimeout(() => { $('toast').classList.remove('show'); lastUndo = null; }, 10000);
 }
 
 $('undoBtn').onclick = () => {
@@ -321,6 +325,9 @@ function openSheet(id) {
   $('sheetName').textContent = pickItem.name;
   $('sheetDate').value = data.today;
   $('sheetDate').max = data.today;
+  const l = pickItem.last;
+  $('sheetUndo').textContent = l ? '前回の記録（' + Number(l.slice(5, 7)) + '/' + Number(l.slice(8)) + '）を取り消す' : '';
+  $('sheetUndo').style.display = l ? '' : 'none';
   $('scrim').classList.add('show');
   $('sheet').classList.add('show');
 }
@@ -328,6 +335,13 @@ function closeSheet() { $('scrim').classList.remove('show'); $('sheet').classLis
 $('scrim').onclick = closeSheet;
 $('sheetCancel').onclick = closeSheet;
 $('sheetOk').onclick = () => { closeSheet(); done(pickItem.id, $('sheetDate').value); };
+// トーストを見逃しても、あとから最新の記録を1件ずつ取り消せる
+$('sheetUndo').onclick = () => {
+  const item = pickItem;
+  closeSheet();
+  call({ action: 'undoLast', itemId: item.id })
+    .then(() => { toast(item.name + ' の記録を取り消しました', false); load(); }).catch(showError);
+};
 
 // 失敗は画面に残す（トーストだけだと消えて原因が分からない）
 function showError(e) { $('due').innerHTML = '<div class="error">エラー：' + esc(e.message || String(e)) + '</div>'; }
