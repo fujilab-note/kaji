@@ -116,12 +116,14 @@
   .keybox { display: none; margin-top: 18px; padding: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
 
   /* 記録後のお知らせ */
-  .toast { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px);
-    width: calc(100% - 32px); max-width: 480px; background: rgba(47,52,55,.96); color: #fff; border-radius: 12px;
+  /* 1件ずつ別のバーにして、新しいものを上へ積む */
+  .toasts { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+    width: calc(100% - 32px); max-width: 480px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .toast { transform: translateY(20px); background: rgba(47,52,55,.96); color: #fff; border-radius: 12px;
     padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; font-size: 14.5px;
     box-shadow: 0 10px 30px rgba(0,0,0,.2); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
     opacity: 0; pointer-events: none; transition: opacity .2s, transform .25s cubic-bezier(.2,.8,.2,1); }
-  .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  .toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
   .toast button { background: none; border: none; color: #7cc4ff; font-size: 14.5px; font-weight: 600; padding: 4px 0 4px 12px; }
 </style>
 </head>
@@ -187,10 +189,10 @@
   <div class="btns"><button class="btn" id="sheetCancel">やめる</button><button class="btn primary" id="sheetOk">記録</button></div>
   <button class="undo-last" id="sheetUndo"></button>
 </div>
-<div class="toast" id="toast"><span id="toastMsg"></span><button id="undoBtn">取り消す</button></div>
+<div class="toasts" id="toasts"></div>
 
 <script>
-let data = null, lastUndo = null, toastTimer = null, pickItem = null;
+let data = null, pickItem = null;
 const $ = id => document.getElementById(id);
 
 // データはGoogle Apps Script経由でNotionから読み書きする
@@ -297,28 +299,32 @@ function done(id, date) {
   if (navigator.vibrate) navigator.vibrate(10);
   const item = data.items.find(i => i.id === id);
   call({ action: 'done', itemId: id, date: date }).then(r => {
-    lastUndo = { logId: r.logId, itemId: id };
-    toast(item.name + ' を記録しました', true);
+    toast(item.name + ' を記録しました', { logId: r.logId, itemId: id });
     load();
   }).catch(e => { el.classList.remove('busy'); showError(e); });
 }
 
-function toast(msg, undoable) {
-  $('toastMsg').textContent = msg;
-  $('undoBtn').style.display = undoable ? '' : 'none';
-  $('toast').classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { $('toast').classList.remove('show'); lastUndo = null; }, 10000);
+// バーごとに取り消す記録と10秒の時計を持たせる（続けて記録しても前のバーから取り消せるように）
+function toast(msg, undo) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = '<span></span>' + (undo ? '<button>取り消す</button>' : '');
+  el.firstChild.textContent = msg;
+  $('toasts').prepend(el);
+  el.offsetWidth; // 一度描かせてから表示クラスを付け、下からせり上がる動きを出す
+  el.classList.add('show');
+  const timer = setTimeout(() => hideToast(el), 10000);
+  if (undo) el.querySelector('button').onclick = () => {
+    clearTimeout(timer);
+    hideToast(el);
+    call({ action: 'undo', logId: undo.logId, itemId: undo.itemId })
+      .then(() => { toast('取り消しました'); load(); }).catch(showError);
+  };
 }
-
-$('undoBtn').onclick = () => {
-  if (!lastUndo) return;
-  const u = lastUndo; lastUndo = null;
-  $('toast').classList.remove('show');
-  clearTimeout(toastTimer);
-  call({ action: 'undo', logId: u.logId, itemId: u.itemId })
-    .then(() => { toast('取り消しました', false); load(); }).catch(showError);
-};
+function hideToast(el) {
+  el.classList.remove('show');
+  setTimeout(() => el.remove(), 250);
+}
 
 function openSheet(id) {
   pickItem = data.items.find(i => i.id === id);
@@ -340,7 +346,7 @@ $('sheetUndo').onclick = () => {
   const item = pickItem;
   closeSheet();
   call({ action: 'undoLast', itemId: item.id })
-    .then(() => { toast(item.name + ' の記録を取り消しました', false); load(); }).catch(showError);
+    .then(() => { toast(item.name + ' の記録を取り消しました'); load(); }).catch(showError);
 };
 
 // 失敗は画面に残す（トーストだけだと消えて原因が分からない）
