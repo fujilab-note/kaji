@@ -193,7 +193,7 @@
   </div>
   <div class="list" id="rest"></div>
 
-  <div class="hint">タップ＝今日やった　長押し＝日付を選んで記録・前回の記録の取り消し<br>v11</div>
+  <div class="hint">タップ＝今日やった　長押し＝日付を選んで記録・前回の記録の取り消し<br>v12</div>
 </div>
 
 <div class="scrim" id="scrim"></div>
@@ -289,7 +289,13 @@ function render(d) {
   data = d;
   const t = new Date(d.today + 'T00:00:00');
   $('date').textContent = (t.getMonth() + 1) + '月' + t.getDate() + '日（' + '日月火水木金土'[t.getDay()] + '）';
-  const due = d.items.filter(i => i.daysLeft == null || i.daysLeft <= 0);
+  const due = d.items
+    .filter(i => i.daysLeft == null || i.daysLeft <= 0)
+    .sort((a, b) => {
+      if (a.daysLeft == null) return b.daysLeft == null ? 0 : -1;
+      if (b.daysLeft == null) return 1;
+      return a.daysLeft - b.daysLeft;
+    });
   const rest = d.items.filter(i => i.daysLeft != null && i.daysLeft > 0);
   $('due').innerHTML = due.length ? due.map(row).join('') : '<div class="empty">すべて期限内です</div>';
   $('rest').innerHTML = rest.length ? rest.map((i, n) => row(i, n + due.length)).join('') : '<div class="empty">なし</div>';
