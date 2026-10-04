@@ -41,7 +41,16 @@
     box-shadow: 0 0 0 1px var(--line), 0 6px 18px rgba(15,15,15,.10); display: flex; align-items: center; justify-content: center; }
   .logo svg { width: 54px; height: 54px; }
   h1 { font-size: 30px; font-weight: 700; margin: 14px 0 2px; letter-spacing: -.01em; }
-  .date { color: var(--sub); font-size: 14px; }
+  .date-row { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+  .date { flex: 1; color: var(--sub); font-size: 14px; }
+  .refresh { width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--sub); padding: 0;
+    -webkit-appearance: none; appearance: none; transition: background .15s, color .15s; }
+  .refresh:active { background: var(--hover); color: var(--text); }
+  .refresh:disabled { opacity: .65; }
+  .refresh svg { width: 20px; height: 20px; }
+  .refresh.loading svg { animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   /* サマリー：期限内の割合の輪と、状態ごとの件数 */
   .summary { display: flex; align-items: center; gap: 16px; margin: 20px 0 6px; padding: 14px 16px;
@@ -140,7 +149,14 @@
     </svg>
   </div>
   <h1>家事</h1>
-  <div class="date" id="date">&nbsp;</div>
+  <div class="date-row">
+    <div class="date" id="date">&nbsp;</div>
+    <button class="refresh" id="refresh" type="button" aria-label="一覧を更新" title="一覧を更新">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M20 6v5h-5"/><path d="M18.5 15.5A7.5 7.5 0 1 1 19.8 9"/>
+      </svg>
+    </button>
+  </div>
 
   <div class="summary" id="summary" style="display:none">
     <div class="ring">
@@ -177,7 +193,7 @@
   </div>
   <div class="list" id="rest"></div>
 
-  <div class="hint">タップ＝今日やった　長押し＝日付を選んで記録・前回の記録の取り消し<br>v10</div>
+  <div class="hint">タップ＝今日やった　長押し＝日付を選んで記録・前回の記録の取り消し<br>v11</div>
 </div>
 
 <div class="scrim" id="scrim"></div>
@@ -192,7 +208,7 @@
 <div class="toasts" id="toasts"></div>
 
 <script>
-let data = null, pickItem = null;
+let data = null, pickItem = null, loadPromise = null;
 const $ = id => document.getElementById(id);
 
 // データはGoogle Apps Script経由でNotionから読み書きする
@@ -216,9 +232,22 @@ async function call(body) {
 function askKey() { $('keybox').style.display = 'block'; $('due').innerHTML = ''; }
 
 function load() {
-  if (!getKey()) return askKey();
-  call({ action: 'items' }).then(render).catch(e => e.message === '合言葉が違います' ? askKey() : showError(e));
+  if (!getKey()) { askKey(); return Promise.resolve(); }
+  if (loadPromise) return loadPromise;
+  $('refresh').classList.add('loading');
+  $('refresh').disabled = true;
+  loadPromise = call({ action: 'items' })
+    .then(render)
+    .catch(e => e.message === '合言葉が違います' ? askKey() : showError(e))
+    .finally(() => {
+      loadPromise = null;
+      $('refresh').classList.remove('loading');
+      $('refresh').disabled = false;
+    });
+  return loadPromise;
 }
+
+$('refresh').onclick = load;
 
 $('keyOk').onclick = () => {
   const v = $('keyInput').value.trim();
