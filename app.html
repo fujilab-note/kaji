@@ -100,6 +100,10 @@
   .bar { height: 3px; border-radius: 3px; background: var(--track); margin-top: 9px; overflow: hidden; }
   .bar i { display: block; height: 100%; border-radius: 3px; transition: width .8s cubic-bezier(.2,.8,.2,1); }
 
+  /* 自由枠が空のとき：一覧の最後に薄く出す */
+  .row.slot .body { opacity: .5; }
+  .row.slot .check { border-style: dashed; }
+
   .empty { color: var(--faint); font-size: 14px; padding: 14px 4px; border-bottom: 1px solid var(--line); }
   .error { color: var(--red); font-size: 14px; padding: 12px 4px; }
   .skeleton { height: 58px; border-bottom: 1px solid var(--line); background: linear-gradient(90deg, transparent, var(--hover), transparent);
@@ -117,7 +121,9 @@
   .sheet-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
   .sheet-sub { font-size: 13px; color: var(--sub); margin-bottom: 14px; }
   .sheet input, .keybox input { width: 100%; font-size: 17px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
-    background: var(--input); color: var(--text); -webkit-appearance: none; appearance: none; min-height: 46px; }
+    background: var(--input); color: var(--text); -webkit-appearance: none; appearance: none; min-height: 46px;
+    -webkit-user-select: text; user-select: text; }
+  .rename { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
   .btns { display: flex; gap: 10px; margin-top: 16px; }
   .btn { flex: 1; font-size: 16px; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--sheet); color: var(--text); }
   .btn.primary { background: #2383e2; border-color: #2383e2; color: #fff; font-weight: 600; }
@@ -193,16 +199,24 @@
   </div>
   <div class="list" id="rest"></div>
 
-  <div class="hint">タップ＝今日やった　長押し＝日付を選んで記録・前回の記録の取り消し<br>v12</div>
+  <div class="hint">タップ＝今日やった　長押し＝日付を選んで記録・前回の記録の取り消し・自由枠の名前<br>v13</div>
 </div>
 
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet">
   <div class="grabber"></div>
   <div class="sheet-title" id="sheetName"></div>
-  <div class="sheet-sub">やった日を選んでください</div>
-  <input type="date" id="sheetDate">
-  <div class="btns"><button class="btn" id="sheetCancel">やめる</button><button class="btn primary" id="sheetOk">記録</button></div>
+  <div id="sheetDone">
+    <div class="sheet-sub">やった日を選んでください</div>
+    <input type="date" id="sheetDate">
+    <div class="btns"><button class="btn" id="sheetCancel">やめる</button><button class="btn primary" id="sheetOk">記録</button></div>
+  </div>
+  <!-- 自由枠だけ：名前を入れる・書き換える・空に戻す -->
+  <div id="sheetFree">
+    <div class="sheet-sub" id="sheetFreeSub"></div>
+    <input id="sheetFreeName" autocomplete="off" placeholder="やることの名前" enterkeyhint="done">
+    <div class="btns"><button class="btn" id="sheetFreeAlt"></button><button class="btn primary" id="sheetFreeOk"></button></div>
+  </div>
   <button class="undo-last" id="sheetUndo"></button>
 </div>
 <div class="toasts" id="toasts"></div>
@@ -275,14 +289,23 @@ function progress(i) {
 
 const CHECK = '<svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-6.5"/></svg>';
 
+const md = s => Number(s.slice(5, 7)) + '/' + Number(s.slice(8));
+
 function row(i, n) {
-  const last = i.last ? '前回 ' + Number(i.last.slice(5, 7)) + '/' + Number(i.last.slice(8)) : '前回なし';
+  const last = i.last ? '前回 ' + md(i.last) : '前回なし';
   const p = progress(i);
   return '<div class="row" data-id="' + i.id + '" style="animation-delay:' + (n * 35) + 'ms"><div class="check">' + CHECK + '</div>' +
     '<div class="body"><div class="top"><div class="name">' + esc(i.name) + '</div></div>' +
-    '<div class="meta">' + status(i) + (i.place ? '<span class="tag t-place">' + esc(i.place) + '</span>' : '') +
-    '<span>' + last + '・' + i.cycle + '日ごと</span></div>' +
+    '<div class="meta">' + status(i) + (i.free ? '<span class="tag t-place">自由枠</span><span>' + md(i.since) + 'に入れた・' + i.cycle + '日以内</span>' :
+      (i.place ? '<span class="tag t-place">' + esc(i.place) + '</span>' : '') + '<span>' + last + '・' + i.cycle + '日ごと</span>') + '</div>' +
     '<div class="bar"><i style="width:0;background:' + p.color + '" data-w="' + p.pct + '"></i></div></div></div>';
+}
+
+// 名前の入っていない自由枠。期限もサマリーの件数も持たない
+function slotRow(s, n) {
+  return '<div class="row slot" data-id="' + s.id + '" style="animation-delay:' + (n * 35) + 'ms"><div class="check"></div>' +
+    '<div class="body"><div class="top"><div class="name">自由枠（未設定）</div></div>' +
+    '<div class="meta"><span>押すと名前を入れられます・入れた日から30日以内</span></div></div></div>';
 }
 
 function render(d) {
@@ -298,7 +321,8 @@ function render(d) {
     });
   const rest = d.items.filter(i => i.daysLeft != null && i.daysLeft > 0);
   $('due').innerHTML = due.length ? due.map(row).join('') : '<div class="empty">すべて期限内です</div>';
-  $('rest').innerHTML = rest.length ? rest.map((i, n) => row(i, n + due.length)).join('') : '<div class="empty">なし</div>';
+  const slot = d.slot ? slotRow(d.slot, d.items.length) : '';
+  $('rest').innerHTML = rest.length || slot ? rest.map((i, n) => row(i, n + due.length)).join('') + slot : '<div class="empty">なし</div>';
   $('dueCount').textContent = due.length;
   $('restCount').textContent = rest.length;
 
@@ -326,6 +350,7 @@ function attach(el) {
 }
 
 function done(id, date) {
+  if (data.slot && data.slot.id === id) return openSheet(id); // 空の自由枠は記録せず、名前を入れる画面を出す
   const item0 = data.items.find(i => i.id === id);
   if (!date && item0 && item0.last === data.today) return openSheet(id); // 今日もう記録済みなら二重に足さず、取り消しを選べる画面を出す
   const el = document.querySelector('.row[data-id="' + id + '"]');
@@ -362,12 +387,21 @@ function hideToast(el) {
 }
 
 function openSheet(id) {
-  pickItem = data.items.find(i => i.id === id);
+  const empty = !!(data.slot && data.slot.id === id);
+  pickItem = empty ? Object.assign({ name: '自由枠' }, data.slot) : data.items.find(i => i.id === id);
   $('sheetName').textContent = pickItem.name;
   $('sheetDate').value = data.today;
   $('sheetDate').max = data.today;
+  // 自由枠：空なら名前を入れるだけ、名前が入っていれば記録の下に書き換え・空に戻すを出す
+  $('sheetDone').style.display = empty ? 'none' : '';
+  $('sheetFree').style.display = empty || pickItem.free ? '' : 'none';
+  $('sheetFree').className = empty ? '' : 'rename';
+  $('sheetFreeSub').textContent = empty ? 'やることの名前を入れてください（今日から30日以内）' : '名前を書き換える（期限はそのまま）';
+  $('sheetFreeName').value = empty ? '' : pickItem.name;
+  $('sheetFreeAlt').textContent = empty ? 'やめる' : '空に戻す';
+  $('sheetFreeOk').textContent = empty ? '入れる' : '書き換える';
   const l = pickItem.last;
-  $('sheetUndo').textContent = l ? '前回の記録（' + Number(l.slice(5, 7)) + '/' + Number(l.slice(8)) + '）を取り消す' : '';
+  $('sheetUndo').textContent = l ? '前回の記録（' + (empty ? pickItem.lastName + '・' : '') + md(l) + '）を取り消す' : '';
   $('sheetUndo').style.display = l ? '' : 'none';
   $('scrim').classList.add('show');
   $('sheet').classList.add('show');
@@ -376,12 +410,27 @@ function closeSheet() { $('scrim').classList.remove('show'); $('sheet').classLis
 $('scrim').onclick = closeSheet;
 $('sheetCancel').onclick = closeSheet;
 $('sheetOk').onclick = () => { closeSheet(); done(pickItem.id, $('sheetDate').value); };
+$('sheetFreeOk').onclick = () => {
+  const name = $('sheetFreeName').value.trim();
+  if (!name) return $('sheetFreeName').focus();
+  const item = pickItem;
+  closeSheet();
+  call({ action: 'setName', itemId: item.id, name: name })
+    .then(() => { toast('自由枠に「' + name + '」を入れました'); load(); }).catch(showError);
+};
+$('sheetFreeAlt').onclick = () => {
+  const item = pickItem;
+  closeSheet();
+  if (!item.free) return; // 空の枠では「やめる」
+  call({ action: 'clearName', itemId: item.id })
+    .then(() => { toast('自由枠を空に戻しました'); load(); }).catch(showError);
+};
 // トーストを見逃しても、あとから最新の記録を1件ずつ取り消せる
 $('sheetUndo').onclick = () => {
   const item = pickItem;
   closeSheet();
   call({ action: 'undoLast', itemId: item.id })
-    .then(() => { toast(item.name + ' の記録を取り消しました'); load(); }).catch(showError);
+    .then(() => { toast((item.lastName || item.name) + ' の記録を取り消しました'); load(); }).catch(showError);
 };
 
 // 失敗は画面に残す（トーストだけだと消えて原因が分からない）
